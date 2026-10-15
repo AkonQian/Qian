@@ -16,58 +16,9 @@ struct BadgeGalleryView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
-                        Label("选择图片或 GIF", systemImage: "photo.on.rectangle.angled")
-                    }
-                    .disabled(client.busy || preparing)
-                    if preparing { ProgressView("正在处理图片…") }
-                    if let preview {
-                        Image(uiImage: preview).resizable().scaledToFill()
-                            .frame(width: 220, height: 220).clipShape(Circle())
-                            .frame(maxWidth: .infinity)
-                    }
-                    if let asset {
-                        Text(asset.detail).font(.footnote)
-                        if asset.format == 2 { Text("此处预览首帧，发送后在圆屏循环播放。 ").font(.caption).foregroundStyle(.secondary) }
-                        Picker("保存到", selection: $target) {
-                            ForEach(0..<4) { index in Text("保存位 \(index + 1)").tag(index) }
-                        }
-                        Button(client.formats[target] == 0 ? "发送到圆屏" : "替换此保存位") {
-                            Task { await client.upload(asset, slot: target) }
-                        }
-                        .disabled(!client.connected || client.busy || preparing)
-                    }
-                    if let preparationError { Text(preparationError).foregroundStyle(.red) }
-                } footer: {
-                    Text("图片按中心裁切适配圆屏。最多保存 4 张；GIF 最长 15 秒、最高 10 帧/秒。图片只经蓝牙发送到你的圆屏。")
-                }
-                Section("圆屏相册") {
-                    ForEach(0..<4) { index in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("保存位 \(index + 1)")
-                                Text(kind(client.formats[index])).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if client.selected == UInt8(index) { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
-                            if client.formats[index] != 0 {
-                                Button("展示") { Task { await client.select(slot: index) } }
-                                    .buttonStyle(.borderless)
-                                Button(role: .destructive) { deleteSlot = index } label: { Image(systemName: "trash") }
-                                    .buttonStyle(.borderless)
-                            }
-                        }.disabled(!client.connected || client.busy)
-                    }
-                    Button("刷新相册状态") { Task { await client.refresh() } }
-                        .disabled(!client.connected || client.busy)
-                } footer: {
-                    Text("在圆屏上左右滑到第 5 页，短按 BOOT 键切换下一张。PWR 键用于电源。图片保存在圆屏，重启后保留。")
-                }
-                Section {
-                    if client.busy { ProgressView(value: client.progress) }
-                    Text(client.message).font(.footnote)
-                }
+                imageSection
+                albumSection
+                statusSection
             }
             .navigationTitle("电子吧唧")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
@@ -81,6 +32,80 @@ struct BadgeGalleryView: View {
                 }
             }
         }
+    }
+
+    private var imageSection: some View {
+        Section {
+        PhotosPicker(selection: $selection, matching: .images, preferredItemEncoding: .current) {
+            Label("选择图片或 GIF", systemImage: "photo.on.rectangle.angled")
+        }
+        .disabled(client.busy || preparing)
+        if preparing { ProgressView("正在处理图片…") }
+        if let preview {
+            Image(uiImage: preview).resizable().scaledToFill()
+                .frame(width: 220, height: 220).clipShape(Circle())
+                .frame(maxWidth: .infinity)
+        }
+        if let asset {
+            Text(asset.detail).font(.footnote)
+            if asset.format == 2 { Text("此处预览首帧，发送后在圆屏循环播放。 ").font(.caption).foregroundStyle(.secondary) }
+            slotPicker
+            Button(client.formats[target] == 0 ? "发送到圆屏" : "替换此保存位") {
+                Task { await client.upload(asset, slot: target) }
+            }
+            .disabled(!client.connected || client.busy || preparing)
+        }
+        if let preparationError { Text(preparationError).foregroundStyle(.red) }
+    } footer: {
+        Text("图片按中心裁切适配圆屏。最多保存 4 张；GIF 最长 15 秒、最高 10 帧/秒。图片只经蓝牙发送到你的圆屏。")
+    }
+    }
+
+    private var slotPicker: some View {
+        Picker("保存到", selection: $target) {
+            Text("保存位 1").tag(0)
+            Text("保存位 2").tag(1)
+            Text("保存位 3").tag(2)
+            Text("保存位 4").tag(3)
+        }
+    }
+
+    private var albumSection: some View {
+        Section {
+        ForEach(0..<4, id: \.self) { index in
+            albumRow(index)
+        }
+        Button("刷新相册状态") { Task { await client.refresh() } }
+            .disabled(!client.connected || client.busy)
+    } header: {
+        Text("圆屏相册")
+    } footer: {
+        Text("在圆屏上左右滑到第 5 页，短按 BOOT 键切换下一张。PWR 键用于电源。图片保存在圆屏，重启后保留。")
+    }
+    }
+
+    private func albumRow(_ index: Int) -> some View {
+        HStack {
+                VStack(alignment: .leading) {
+                    Text("保存位 \(index + 1)")
+                    Text(kind(client.formats[index])).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if client.selected == UInt8(index) { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
+                if client.formats[index] != 0 {
+                    Button("展示") { Task { await client.select(slot: index) } }
+                        .buttonStyle(.borderless)
+                    Button(role: .destructive) { deleteSlot = index } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless)
+                }
+        }.disabled(!client.connected || client.busy)
+    }
+
+    private var statusSection: some View {
+        Section {
+        if client.busy { ProgressView(value: client.progress) }
+        Text(client.message).font(.footnote)
+    }
     }
 
     private func kind(_ value: UInt8) -> String {
