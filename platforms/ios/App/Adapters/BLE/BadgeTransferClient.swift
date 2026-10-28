@@ -4,12 +4,14 @@ import Foundation
 
 @MainActor
 final class BadgeTransferClient: ObservableObject {
+    nonisolated static let slotCount = 3
+    nonisolated static func validSlot(_ slot: Int) -> Bool { (0..<slotCount).contains(slot) }
     static let rxUUID = CBUUID(string: MotoBadgeCodec.rxUUID())
     static let txUUID = CBUUID(string: MotoBadgeCodec.txUUID())
     @Published private(set) var connected = false
     @Published private(set) var busy = false
     @Published private(set) var progress = 0.0
-    @Published private(set) var formats: [UInt8] = [0, 0, 0, 0]
+    @Published private(set) var formats: [UInt8] = [0, 0, 0]
     @Published private(set) var selected: UInt8 = 255
     @Published private(set) var message = "连接支持相册功能的圆屏后即可发送。"
     private weak var peripheral: CBPeripheral?
@@ -36,7 +38,7 @@ final class BadgeTransferClient: ObservableObject {
     func detach() {
         generation &+= 1
         connected = false
-        formats = [0, 0, 0, 0]; selected = 255
+        formats = [0, 0, 0]; selected = 255
         peripheral = nil; rx = nil; tx = nil
         timeout?.cancel(); timeout = nil
         let continuation = pending?.continuation; pending = nil
@@ -47,7 +49,7 @@ final class BadgeTransferClient: ObservableObject {
         connected = error == nil && characteristic.isNotifying
         if let error { message = error.localizedDescription }
         if connected {
-            message = "已连接，可发送到 4 个保存位。"
+            message = "已连接，可发送到 3 个保存位。"
             Task { await refresh() }
         }
     }
@@ -55,7 +57,8 @@ final class BadgeTransferClient: ObservableObject {
     func receive(_ data: Data?, error: Error?) {
         if let error { failPending(error); return }
         guard let data, let reply = MotoBadgeCodec.decodeReply(data) else { return }
-        formats = reply.formats.map(\.uint8Value); selected = reply.selected
+        formats = Array((reply.formats.map(\.uint8Value) + [0, 0, 0]).prefix(Self.slotCount))
+        selected = reply.selected < UInt8(Self.slotCount) ? reply.selected : 255
         guard let pending, pending.id == reply.requestID,
               pending.operation == reply.operation, pending.slot == reply.slot else { return }
         self.pending = nil; timeout?.cancel(); timeout = nil
@@ -102,17 +105,17 @@ final class BadgeTransferClient: ObservableObject {
 
     func refresh() async { await perform { _ = try await self.request(1) } }
     func remove(slot: Int) async {
-        guard (0..<4).contains(slot) else { return }
+        guard Self.validSlot(slot) else { return }
         await perform { _ = try await self.request(5, slot: UInt8(slot)) }
     }
     func select(slot: Int) async {
-        guard (0..<4).contains(slot) else { return }
+        guard Self.validSlot(slot) else { return }
         await perform { _ = try await self.request(6, slot: UInt8(slot)) }
     }
 
     func upload(_ asset: BadgePreparedAsset, slot: Int) async {
         await perform {
-            guard (0..<4).contains(slot), asset.data.count <= 512 * 1024,
+            guard Self.validSlot(slot), asset.data.count <= 512 * 1024,
                   let peripheral = self.peripheral else { throw Failure(text: "图片或保存位无效。") }
             let epoch = self.generation
             self.progress = 0

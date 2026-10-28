@@ -57,7 +57,7 @@ struct BadgeGalleryView: View {
         }
         if let preparationError { Text(preparationError).foregroundStyle(.red) }
     } footer: {
-        Text("图片按中心裁切适配圆屏。最多保存 4 张；GIF 最长 15 秒、最高 10 帧/秒。图片只经蓝牙发送到你的圆屏。")
+        Text("图片按中心裁切适配圆屏。最多保存 3 张；GIF 最长 15 秒、最高 10 帧/秒。图片只经蓝牙发送到你的圆屏。")
     }
     }
 
@@ -66,13 +66,12 @@ struct BadgeGalleryView: View {
             Text("保存位 1").tag(0)
             Text("保存位 2").tag(1)
             Text("保存位 3").tag(2)
-            Text("保存位 4").tag(3)
         }
     }
 
     private var albumSection: some View {
         Section {
-        ForEach(0..<4, id: \.self) { index in
+        ForEach(0..<BadgeTransferClient.slotCount, id: \.self) { index in
             albumRow(index)
         }
         Button("刷新相册状态") { Task { await client.refresh() } }

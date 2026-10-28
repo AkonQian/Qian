@@ -1,4 +1,5 @@
 #import "MotoBLEProtocolBridge.h"
+#include "phone_volume_protocol.hpp"
 #import "../Navigation/MotoNavCoreBridge.h"
 
 #include <algorithm>
@@ -391,6 +392,10 @@ moto::ble::ConnectionStatus PhoneConnectionStatus(
 
 + (NSString *)serviceUUIDString {
   return [NSString stringWithUTF8String:moto::ble::kServiceUuid];
+}
+
++ (NSString *)phoneVolumeUUIDString {
+  return [NSString stringWithUTF8String:moto::media::kPhoneVolumeUuid];
 }
 
 + (NSString *)phoneToDeviceUUIDString {

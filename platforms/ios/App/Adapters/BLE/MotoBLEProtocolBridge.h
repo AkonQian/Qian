@@ -125,6 +125,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) uint16_t lastEncodedSequence;
 
 + (NSString *)serviceUUIDString;
++ (NSString *)phoneVolumeUUIDString;
 + (NSString *)phoneToDeviceUUIDString;
 + (NSString *)deviceToPhoneUUIDString;
 
