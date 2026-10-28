@@ -174,11 +174,23 @@ struct BLEMapSceneDelivery {
     }
 }
 
+
+@MainActor
+struct BLEAccessoryDiscovery {
+    private var requested = false
+    mutating func needsDiscovery(_ discovered: [CBUUID]) -> Bool {
+        let required = [BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid]
+        guard !requested, !required.allSatisfy({ discovered.contains($0) }) else { return false }
+        requested = true
+        return true
+    }
+}
+
 @MainActor
 final class ESP32BLECentral: NSObject {
     let badge = BadgeTransferClient()
     private let phoneVolume = PhoneVolumeTelemetry()
-    private var badgeDiscoveryRequested = false
+    private var accessoryDiscovery = BLEAccessoryDiscovery()
     // UUIDs belong to the CoreBluetooth transport adapter; the byte format is
     // implemented only by shared/ble_protocol through MotoBLEProtocolBridge.
     private static let serviceUUID = CBUUID(string: MotoBLEProtocolCodec.serviceUUIDString())
@@ -430,7 +442,7 @@ final class ESP32BLECentral: NSObject {
             } else {
                 trace("using restored navigation service; rediscovering characteristics")
                 candidate.discoverCharacteristics(
-                    [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID],
+                    [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID, BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid],
                     for: service
                 )
             }
@@ -489,8 +501,8 @@ final class ESP32BLECentral: NSObject {
         if let badgeRX = characteristics.first(where: { $0.uuid == BadgeTransferClient.rxUUID }),
            let badgeTX = characteristics.first(where: { $0.uuid == BadgeTransferClient.txUUID }) {
             badge.attach(candidate, rx: badgeRX, tx: badgeTX)
-        } else if !badgeDiscoveryRequested {
-            badgeDiscoveryRequested = true
+        }
+        if accessoryDiscovery.needsDiscovery(characteristics.map(\.uuid)) {
             candidate.discoverCharacteristics([Self.phoneToDeviceUUID, Self.deviceToPhoneUUID,
                 BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid], for: service)
         }
@@ -685,7 +697,7 @@ final class ESP32BLECentral: NSObject {
         phoneToDeviceCharacteristic = nil
         badge.detach()
         phoneVolume.detach()
-        badgeDiscoveryRequested = false
+        accessoryDiscovery = BLEAccessoryDiscovery()
         deviceToPhoneCharacteristic = nil
         codec = nil
         handshake = nil

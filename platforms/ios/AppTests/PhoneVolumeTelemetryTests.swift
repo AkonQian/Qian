@@ -1,8 +1,21 @@
 import Foundation
+import CoreBluetooth
 import XCTest
 @testable import MOTO_GPS
 
 final class PhoneVolumeTelemetryTests: XCTestCase {
+    @MainActor func testCachedBadgeCharacteristicsStillDiscoverNewVolumeChannel() {
+        let oldCache = [BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID]
+        var discovery = BLEAccessoryDiscovery()
+        XCTAssertTrue(discovery.needsDiscovery(oldCache))
+        XCTAssertFalse(discovery.needsDiscovery(oldCache)) // old firmware: no rediscovery loop
+        let fresh = oldCache + [PhoneVolumeTelemetry.uuid]
+        XCTAssertFalse(discovery.needsDiscovery(fresh))
+        discovery = BLEAccessoryDiscovery() // reconnect/restoration starts a new discovery pass
+        XCTAssertTrue(discovery.needsDiscovery(oldCache))
+        discovery = BLEAccessoryDiscovery()
+        XCTAssertFalse(discovery.needsDiscovery(fresh))
+    }
     func testSystemVolumePacketUsesActualRoundedValueAndUnknownSentinel() {
         XCTAssertEqual(PhoneVolumeTelemetry.encode(volume: 0), Data([1, 0]))
         XCTAssertEqual(PhoneVolumeTelemetry.encode(volume: 1), Data([1, 100]))
