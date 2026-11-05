@@ -13,6 +13,7 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
     root = info_path.removesuffix('Info.plist')
     info = plistlib.loads(archive.read(info_path))
     assert info['CFBundlePackageType'] == 'APPL'
+    assert info['CFBundleDisplayName'] == 'Qian GPS', 'App display name must be Qian GPS'
     assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS'], 'Must be a device build'
     assert info['MOTOGPSGatewayBaseURL'] == 'https://example.invalid/moto-gps/api/', 'Do not ship a private gateway'
     assert {'location', 'bluetooth-central'} <= set(info['UIBackgroundModes'])

@@ -98,7 +98,7 @@ struct MapDownloadsView: View {
                             Text("深圳离线底图已内置")
                             Text(store.statusText).font(.subheadline).foregroundStyle(.secondary)
                         }
-                    } icon: { Image(systemName: "network").foregroundStyle(.blue) }
+                    } icon: { Image(systemName: "network").foregroundStyle(QianTheme.accent) }
                 } footer: {
                     Text("深圳道路与建筑底图随 App 安装，无需下载或开通 R2。骑行时自动读取当前位置周边；搜索目的地和规划新路线仍需网络。其他地区需要另行配置在线地图或下载地图。")
                 }
@@ -170,6 +170,7 @@ struct MapDownloadsView: View {
                 } footer: { Text("建筑和道路的完整程度取决于当地地图数据。") }
             }
             .listStyle(.insetGrouped)
+            .modifier(QianInstrumentSurface())
             .navigationTitle("地图")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -251,8 +252,8 @@ private struct MapCityDownloadView: View {
             Section {
                 Map(initialPosition: .region(region)) {
                     MapPolygon(coordinates: corners)
-                        .foregroundStyle(.blue.opacity(0.1))
-                        .stroke(.blue, lineWidth: 2)
+                        .foregroundStyle(QianTheme.accent.opacity(0.1))
+                        .stroke(QianTheme.accent, lineWidth: 2)
                 }
                 .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
                 .frame(height: 260)

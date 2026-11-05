@@ -191,8 +191,8 @@ final class AppModel: ObservableObject {
         if let navigationFailure { return navigationFailure }
         if isDemoActive, navigation.stateName == "navigating" {
             return deviceReady
-                ? "真实济南路网正在同步 · 道路 © OpenStreetMap contributors"
-                : "真实济南路网运行中 · 道路 © OpenStreetMap contributors"
+                ? "演示指引正在同步 · 当前为模拟骑行"
+                : "演示指引运行中 · 当前为模拟骑行"
         }
         switch navigation.stateName {
         case "acquiring": return "请保持精确定位开启"
@@ -221,7 +221,7 @@ final class AppModel: ObservableObject {
     }
 
     var activeDestinationName: String {
-        isDemoActive ? "MOTO GPS 演示路线" : (selectedPlace?.name ?? "目的地")
+        isDemoActive ? "Qian GPS 演示路线" : (selectedPlace?.name ?? "目的地")
     }
 
     var searchScopeText: String {

@@ -8,6 +8,7 @@ struct GatewaySettingsView: View {
     @State private var message: String?
     @State private var isChecking = false
     @State private var checkTask: Task<Void, Never>?
+    @State private var showsDataUse = false
 
     var body: some View {
         NavigationStack {
@@ -49,7 +50,15 @@ struct GatewaySettingsView: View {
                 if model.isNavigationActive {
                     Section { Text("请先结束导航，再更换网关地址。") }
                 }
+                Section("隐私与数据") {
+                    Button { showsDataUse = true } label: {
+                        Label("隐私与数据", systemImage: "hand.raised")
+                            .foregroundStyle(Color.primary)
+                    }
+                    .accessibilityIdentifier("privacy-data-button")
+                }
             }
+            .modifier(QianInstrumentSurface())
             .navigationTitle("网关设置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -79,7 +88,9 @@ struct GatewaySettingsView: View {
                 message = nil
             }
             .onDisappear { checkTask?.cancel() }
+            .sheet(isPresented: $showsDataUse) { DataUseView() }
         }
+        .preferredColorScheme(.dark)
     }
 
     private func checkConnection() {

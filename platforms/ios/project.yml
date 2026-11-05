@@ -41,7 +41,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: MOTO GPS
+        CFBundleDisplayName: Qian GPS
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
@@ -49,10 +49,10 @@ targets:
           UIColorName: LaunchBackground
           UIImageName: LaunchLogo
           UIImageRespectsSafeAreaInsets: true
-        NSLocationWhenInUseUsageDescription: MOTO GPS 需要定位来规划路线并更新骑行位置。
-        NSLocationAlwaysAndWhenInUseUsageDescription: 导航开始后，MOTO GPS 需要在锁屏或切换应用时继续更新骑行位置。
-        NSBluetoothAlwaysUsageDescription: MOTO GPS 使用蓝牙连接车把上的 ESP32-S3 圆屏设备。
-        NSAppleMusicUsageDescription: MOTO GPS 需要读取并控制 Apple Music 播放，以便在车把圆屏上切歌和暂停。
+        NSLocationWhenInUseUsageDescription: Qian GPS 需要定位来规划路线并更新骑行位置。
+        NSLocationAlwaysAndWhenInUseUsageDescription: 导航开始后，Qian GPS 需要在锁屏或切换应用时继续更新骑行位置。
+        NSBluetoothAlwaysUsageDescription: Qian GPS 使用蓝牙连接车把上的 ESP32-S3 圆屏设备。
+        NSAppleMusicUsageDescription: Qian GPS 需要读取并控制 Apple Music 播放，以便在车把圆屏上切歌和暂停。
         UIBackgroundModes:
           - location
           - bluetooth-central
@@ -67,8 +67,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.example.motogps
         PRODUCT_NAME: MOTO GPS
-        MARKETING_VERSION: 0.3.7
-        CURRENT_PROJECT_VERSION: 12
+        MARKETING_VERSION: 0.3.8
+        CURRENT_PROJECT_VERSION: 13
         SWIFT_VERSION: 5.0
         SWIFT_STRICT_CONCURRENCY: targeted
         SWIFT_OBJC_BRIDGING_HEADER: App/MotoGPS-Bridging-Header.h

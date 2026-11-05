@@ -21,6 +21,7 @@ struct BadgeGalleryView: View {
                 statusSection
             }
             .navigationTitle("电子吧唧")
+            .modifier(QianInstrumentSurface())
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
             .task { await client.refresh() }
             .task(id: selection) { await prepareSelection() }

@@ -7,7 +7,7 @@ final class GatewaySettingsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
         app.launch()
-        let setup = app.buttons["gateway-setup-button"]
+        let setup = app.buttons["gateway-settings-toolbar"]
         XCTAssertTrue(setup.waitForExistence(timeout: 10))
         setup.tap()
         let field = app.textFields["gateway-address-field"].exists
@@ -35,7 +35,7 @@ final class GatewaySettingsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
         app.launch()
-        let setup = app.buttons["gateway-setup-button"]
+        let setup = app.buttons["gateway-settings-toolbar"]
         XCTAssertTrue(setup.waitForExistence(timeout: 10))
         setup.tap()
         let field = app.descendants(matching: .any).matching(identifier: "gateway-address-field").firstMatch
@@ -47,6 +47,62 @@ final class GatewaySettingsUITests: XCTestCase {
         XCTAssertTrue(error.waitForExistence(timeout: 5))
         XCTAssertTrue(error.label.contains("HTTPS"))
         keepScreenshot(app, "Invalid gateway address")
+    }
+
+    func testInstrumentHomeMovesPrivacyIntoTopLeftSettings() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["home-ride-dashboard"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["qian-brand-title"].label, "Qian GPS")
+        XCTAssertFalse(app.buttons["gateway-setup-button"].exists)
+        XCTAssertFalse(app.buttons["gateway-settings-button"].exists)
+        XCTAssertFalse(app.buttons["privacy-data-button"].exists)
+        keepScreenshot(app, "Qian GPS instrument home")
+        app.buttons["gateway-settings-toolbar"].tap()
+        let privacy = app.buttons["privacy-data-button"]
+        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
+        for _ in 0..<4 where !privacy.isHittable { app.swipeUp() }
+        XCTAssertTrue(privacy.isHittable)
+        keepScreenshot(app, "Qian GPS settings and privacy entry")
+        privacy.tap()
+        let done = app.buttons["privacy-data-done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        keepScreenshot(app, "Qian GPS privacy screen")
+        done.tap()
+        XCTAssertTrue(app.buttons["gateway-save-button"].waitForExistence(timeout: 5))
+    }
+
+    func testInstrumentHomeAccessibilityLayoutAndDeviceSheet() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["gateway-settings-toolbar"].waitForExistence(timeout: 10))
+        let search = app.textFields["destination-search-field"]
+        for _ in 0..<4 where !search.isHittable { app.swipeUp() }
+        XCTAssertTrue(search.isHittable)
+        keepScreenshot(app, "Qian GPS large text home")
+        app.buttons["device-details-button"].tap()
+        XCTAssertTrue(app.buttons["device-details-done"].waitForExistence(timeout: 5))
+        keepScreenshot(app, "Qian GPS instrument device details")
+    }
+
+    func testInstrumentDemoRideKeepsEndActionReachable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
+        app.launch()
+        let demo = app.buttons["demo-navigation-button"]
+        XCTAssertTrue(demo.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !demo.isHittable { app.swipeUp() }
+        demo.tap()
+        let dashboard = app.descendants(matching: .any)["active-ride-dashboard"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 10))
+        let end = app.buttons["primary-navigation-action"]
+        XCTAssertTrue(end.isHittable)
+        keepScreenshot(app, "Qian GPS active ride instrument")
+        end.tap()
+        XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 5))
     }
 
     private func keepScreenshot(_ app: XCUIApplication, _ name: String) {
