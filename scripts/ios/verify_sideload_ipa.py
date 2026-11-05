@@ -19,8 +19,11 @@ with zipfile.ZipFile(sys.argv[1]) as archive:
     assert not any(p.endswith(('embedded.mobileprovision', '.p12', '.p8', '.pem')) or '/_CodeSignature/' in p for p in names), 'Signing credentials/profile must not be distributed'
     for name in ['NSBluetoothAlwaysUsageDescription', 'NSLocationAlwaysAndWhenInUseUsageDescription', 'NSLocationWhenInUseUsageDescription']:
         assert info.get(name), name
-    for resource in ['PrivacyInfo.xcprivacy', 'NOTICE', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md', 'jinan-v1.sqlite']:
+    for resource in ['PrivacyInfo.xcprivacy', 'NOTICE', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md', 'shenzhen-v1.sqlite']:
         assert root + resource in names, f'Missing {resource}'
+    assert root + 'jinan-v1.sqlite' not in names, 'Do not ship the removed Jinan map'
+    assert root + 'jinan_map_scene_sample.json' not in names, 'Do not ship the removed Jinan map sample'
+    assert archive.getinfo(root + 'shenzhen-v1.sqlite').file_size > 100_000, 'Shenzhen city map is unexpectedly small'
     binary = archive.read(root + info['CFBundleExecutable'])
     magic, cpu = struct.unpack_from('<II', binary)
     assert magic == 0xFEEDFACF and cpu == 0x0100000C, 'Expected arm64 Mach-O'
