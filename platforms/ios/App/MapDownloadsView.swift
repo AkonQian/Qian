@@ -95,12 +95,12 @@ struct MapDownloadsView: View {
                 Section {
                     Label {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("自动加载周边地图")
+                            Text("深圳离线底图已内置")
                             Text(store.statusText).font(.subheadline).foregroundStyle(.secondary)
                         }
                     } icon: { Image(systemName: "network").foregroundStyle(.blue) }
                 } footer: {
-                    Text("骑行时自动加载圆屏周边的道路和建筑。网络不可用时，使用已下载的地图。")
+                    Text("深圳道路与建筑底图随 App 安装，无需下载或开通 R2。骑行时自动读取当前位置周边；搜索目的地和规划新路线仍需网络。其他地区需要另行配置在线地图或下载地图。")
                 }
                 Section {
                     NavigationLink {
@@ -155,7 +155,7 @@ struct MapDownloadsView: View {
                                 .disabled(store.isDownloading)
                         }
                     }
-                    Label("济南基础地图 · 随 App 提供", systemImage: "internaldrive")
+                    Label("深圳基础地图 · 随 App 提供", systemImage: "internaldrive")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 Section {
@@ -217,7 +217,7 @@ private struct MapCitySearchView: View {
                 ContentUnavailableView(
                     search.query.count >= 2 ? "未找到城市" : "添加常用城市",
                     systemImage: "building.2",
-                    description: Text("输入城市或区县名称，例如“济南”“上海”“历下区”。")
+                    description: Text("输入城市或区县名称，例如“深圳”“上海”“南山区”。")
                 )
             } else {
                 ForEach(search.cities) { city in

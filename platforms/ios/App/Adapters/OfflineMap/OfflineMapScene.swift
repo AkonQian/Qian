@@ -410,7 +410,7 @@ final class OfflineMapSceneCoordinator {
     }
 
     convenience init(bundle: Bundle = .main) throws {
-        let databaseName = "jinan-v1"
+        let databaseName = "shenzhen-v1"
         var databaseURLs: [URL] = []
         if let supportRoot = FileManager.default.urls(
             for: .applicationSupportDirectory,
@@ -424,10 +424,7 @@ final class OfflineMapSceneCoordinator {
         if let bundledDatabase = bundle.url(forResource: databaseName, withExtension: "sqlite") {
             databaseURLs.append(bundledDatabase)
         }
-        self.init(index: try Self.loadIndex(databaseURLs: databaseURLs, sampleURL: bundle.url(
-            forResource: "jinan_map_scene_sample",
-            withExtension: "json"
-        )))
+        self.init(index: try Self.loadIndex(databaseURLs: databaseURLs, sampleURL: nil))
     }
 
     static func loadIndex(databaseURLs: [URL], sampleURL: URL?) throws -> any OfflineMapSceneQuerying {

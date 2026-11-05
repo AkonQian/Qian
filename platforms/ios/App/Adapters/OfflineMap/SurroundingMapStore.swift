@@ -379,7 +379,7 @@ actor MapTileCache {
 
 @MainActor
 final class SurroundingMapStore: ObservableObject {
-    @Published private(set) var statusText = "在线地图优先，离线地图备用"
+    @Published private(set) var statusText = "深圳离线底图已内置"
     @Published private(set) var isDownloading = false
     @Published private(set) var downloadProgress = 0.0
     @Published private(set) var downloadMessage: String?
@@ -403,10 +403,10 @@ final class SurroundingMapStore: ObservableObject {
                                                             in: .userDomainMask)[0]
             .appendingPathComponent("SurroundingMaps", isDirectory: true)
         cache = MapTileCache(root: storage, loader: loader ?? Self.httpLoader(baseURL: baseURL))
-        let bundled = bundle.url(forResource: "jinan-v1", withExtension: "sqlite")
+        let bundled = bundle.url(forResource: "shenzhen-v1", withExtension: "sqlite")
         fallback = try? OfflineMapSceneCoordinator.loadIndex(
             databaseURLs: bundled.map { [$0] } ?? [],
-            sampleURL: bundle.url(forResource: "jinan_map_scene_sample", withExtension: "json"))
+            sampleURL: nil)
         Task { [weak self] in await self?.reloadPacks() }
     }
 
@@ -423,6 +423,23 @@ final class SurroundingMapStore: ObservableObject {
                                      longitudeE6: Int32((longitudeDeg * 1_000_000).rounded()))
         if let lastOrigin, Self.distance(lastOrigin, origin) < 100,
            retryAfter.map({ Date() < $0 }) ?? true { return }
+        // A bundled Shenzhen window requires neither a map server nor R2.
+        // Never fall back to the old Jinan sample when outside this pack.
+        if let local = fallback?.query(around: origin, radiusM: 500, revision: revision),
+           !local.roads.isEmpty || !local.buildings.isEmpty {
+            generation &+= 1
+            sceneTask?.cancel()
+            sceneTask = nil
+            lastOrigin = origin
+            retryAfter = Date().addingTimeInterval(24 * 60 * 60)
+            revision &+= 1
+            if revision == 0 { revision = 1 }
+            onScene?(OfflineMapSceneWindow(revision: revision, origin: local.origin,
+                                          radiusM: local.radiusM, roads: local.roads,
+                                          buildings: local.buildings))
+            statusText = "深圳离线地图 · 无需下载"
+            return
+        }
         let tiles: [MapTileID]
         do {
             tiles = Array(Set(try MapTilePlanner.aroundGCJ02(latitudeDeg: latitudeDeg,
@@ -500,7 +517,7 @@ final class SurroundingMapStore: ObservableObject {
         sceneTask = nil
         lastOrigin = nil
         retryAfter = nil
-        statusText = "在线地图优先，离线地图备用"
+        statusText = "深圳离线底图已内置"
     }
 
     func download(name: String, detail: String, tiles: [MapTileID]) {

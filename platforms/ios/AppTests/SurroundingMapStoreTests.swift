@@ -32,6 +32,29 @@ private func mapTileTestData(_ tile: MapTileID, roadCount: Int = 1) throws -> Da
 
 @MainActor
 final class SurroundingMapStoreTests: XCTestCase {
+    func testBundledShenzhenWindowDoesNotRequestOnlineTiles() async throws {
+        let root = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let loader = MapTileTestLoader()
+        let store = SurroundingMapStore(baseURL: URL(string: "https://example.invalid/")!,
+                                        storageURL: root, loader: { try await loader.load($0) })
+        var windows: [OfflineMapSceneWindow] = []
+        store.onScene = { windows.append($0) }
+        store.update(latitudeDeg: 22.545, longitudeDeg: 114.065)
+        XCTAssertEqual(windows.count, 1)
+        XCTAssertFalse(try XCTUnwrap(windows.first).roads.isEmpty)
+        XCTAssertFalse(try XCTUnwrap(windows.first).buildings.isEmpty)
+        XCTAssertEqual(store.statusText, "深圳离线地图 · 无需下载")
+        try await Task.sleep(nanoseconds: 100_000_000)
+        let calls = await loader.calls
+        XCTAssertEqual(calls, 0)
+        store.update(latitudeDeg: 22.5451, longitudeDeg: 114.065)
+        XCTAssertEqual(windows.count, 1)
+        store.update(latitudeDeg: 22.547, longitudeDeg: 114.065)
+        XCTAssertEqual(windows.count, 2)
+        XCTAssertGreaterThan(windows[1].revision, windows[0].revision)
+    }
+
     private func temporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("moto-map-\(UUID().uuidString)")
     }
