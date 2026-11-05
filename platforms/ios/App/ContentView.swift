@@ -81,7 +81,7 @@ struct ContentView: View {
                 Text("今天去哪里？").font(.headline).foregroundStyle(Color.primary).textCase(nil)
             } footer: {
                 if !model.isGatewayConfigured {
-                    Text("导航服务待配置，请通过左上角的网关设置完成。")
+                    Text("导航服务待配置，请通过骑行工具中的网关设置完成。")
                 }
             }
             if !model.destinationQuery.isEmpty {
@@ -90,12 +90,28 @@ struct ContentView: View {
                 if !model.recentPlaces.isEmpty { recentPlacesSection }
                 Section {
                     deviceSummaryButton
+                    mapDownloadsButton
                     Button { showsBadgeGallery = true } label: {
-                        Label("电子吧唧", systemImage: "photo.on.rectangle.angled")
+                        Label("徽章图库", systemImage: "photo.on.rectangle.angled")
                             .foregroundStyle(Color.primary).padding(.vertical, 7)
                     }
-                    mapDownloadsButton
-                    demoButton
+                    .accessibilityIdentifier("badge-gallery-button")
+                    Button {
+                        searchFocused = false
+                        showsGatewaySettings = true
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("网关设置").foregroundStyle(Color.primary)
+                                Text("服务地址 · 隐私与数据")
+                                    .font(.subheadline).foregroundStyle(Color.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "slider.horizontal.3").foregroundStyle(QianTheme.accent)
+                        }
+                        .padding(.vertical, 7)
+                    }
+                    .accessibilityIdentifier("gateway-settings-button")
                 } header: {
                     Text("骑行工具").font(.caption.weight(.bold)).tracking(2)
                 } footer: {
@@ -106,24 +122,10 @@ struct ContentView: View {
         .listStyle(.insetGrouped)
         .modifier(QianInstrumentSurface())
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("Qian GPS")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { showsGatewaySettings = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .accessibilityLabel("网关设置")
-                .accessibilityIdentifier("gateway-settings-toolbar")
-            }
-            ToolbarItem(placement: .principal) {
-                Text("Qian GPS").font(.system(.headline, design: .rounded).weight(.bold))
-                    .tracking(0.5)
-                    .accessibilityIdentifier("qian-brand-title")
-            }
-            ToolbarItem(placement: .topBarTrailing) { deviceToolbarButton }
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button("完成") { searchFocused = false }
@@ -144,17 +146,8 @@ struct ContentView: View {
                 Spacer(minLength: 8)
                 QianStatusBadge(title: model.deviceReady ? "圆屏已连接" : "圆屏未连接", active: model.deviceReady)
             }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .bottom, spacing: 18) {
-                    speedReadout(active: active)
-                    Spacer(minLength: 0)
-                    Image(systemName: active ? navigationSymbol : "location.north.circle")
-                        .font(.system(size: active ? 46 : 72, weight: .ultraLight))
-                        .foregroundStyle(QianTheme.accent.opacity(active ? 1 : 0.55))
-                        .padding(.bottom, 14).accessibilityHidden(true)
-                }
-                speedReadout(active: active)
-            }
+            speedReadout(active: active)
+                .frame(maxWidth: .infinity)
             Rectangle().fill(QianTheme.border).frame(height: 1).accessibilityHidden(true)
             if active {
                 VStack(alignment: .leading, spacing: 7) {
@@ -170,6 +163,15 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 12) { dashboardStatuses }
                 }
             }
+            HStack(alignment: .firstTextBaseline) {
+                Text("总骑行公里数").font(.caption).foregroundStyle(Color.secondary)
+                Spacer(minLength: 8)
+                Text(String(format: "%.1f", model.totalRideDistanceM / 1_000))
+                    .font(.system(.title3, design: .rounded).weight(.bold)).monospacedDigit()
+                Text("km").font(.caption).foregroundStyle(Color.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("total-ride-distance")
         }
         .padding(22)
         .background(LinearGradient(colors: [QianTheme.elevated, QianTheme.panel], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 24))
@@ -183,20 +185,21 @@ struct ContentView: View {
     }
 
     private func speedReadout(active: Bool) -> some View {
-        HStack(alignment: .lastTextBaseline, spacing: 10) {
+        VStack(spacing: 7) {
             Text(active && model.navigation.hasUsableFix && !model.navigation.gnssStale
-                 ? String(format: "%.0f", max(0, model.navigation.speedMPS * 3.6)) : "—")
-                .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 76 : 100, weight: .bold, design: .rounded))
+                 ? String(format: "%.0f", max(0, model.navigation.speedMPS * 3.6)) : (active ? "—" : "0"))
+                .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 96 : 120, weight: .bold, design: .rounded))
                 .monospacedDigit().tracking(-4).lineLimit(1).minimumScaleFactor(0.65)
                 .contentTransition(.numericText())
                 .accessibilityIdentifier("ride-speed-value")
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 5) {
                 Text("KM/H").font(.system(.caption, design: .monospaced).weight(.bold)).tracking(1)
                 Text(active ? (model.navigation.gnssStale ? "位置待更新" : "当前速度") : "导航后显示速度")
                     .font(.caption2).fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(Color.secondary).padding(.bottom, 8)
+            .foregroundStyle(Color.secondary)
         }
+        .frame(maxWidth: .infinity).padding(.vertical, 6)
         .accessibilityElement(children: .combine)
     }
 
@@ -340,26 +343,6 @@ struct ContentView: View {
         model.selectPlace(place)
     }
 
-    private var demoButton: some View {
-        Button {
-            searchFocused = false
-            model.startDemoNavigation()
-        } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("演示导航").foregroundStyle(Color.primary)
-                    Text("先体验一次导航流程")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.secondary)
-                }
-            } icon: {
-                Image(systemName: "play.circle").foregroundStyle(QianTheme.accent)
-            }
-            .padding(.vertical, 5)
-        }
-        .accessibilityIdentifier("demo-navigation-button")
-    }
-
     // MARK: - Route selection
 
     private var mapDownloadsButton: some View {
@@ -456,6 +439,7 @@ struct ContentView: View {
         .listStyle(.insetGrouped)
         .modifier(QianInstrumentSurface())
         .navigationTitle("路线")
+        .toolbar(.visible, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -563,7 +547,7 @@ struct ContentView: View {
         .modifier(QianInstrumentSurface())
         .navigationTitle(model.isDemoActive ? "演示导航" : "导航中")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { deviceToolbarButton } }
+        .toolbar(.visible, for: .navigationBar)
         .safeAreaInset(edge: .bottom, spacing: 0) { navigationActionBar }
     }
 
@@ -611,16 +595,6 @@ struct ContentView: View {
     }
 
     // MARK: - Device sheet
-
-    private var deviceToolbarButton: some View {
-        Button {
-            searchFocused = false
-            showsDeviceDetails = true
-        } label: { Image(systemName: "circle.circle") }
-        .accessibilityLabel("我的圆屏")
-        .accessibilityValue(deviceStatus)
-        .accessibilityIdentifier("device-details-button")
-    }
 
     private var deviceSummaryButton: some View {
         Button {
@@ -689,6 +663,11 @@ struct ContentView: View {
                     if model.searchLocationStatus == .permissionDenied {
                         Button("前往设置开启定位", action: openSystemSettings)
                     }
+                }
+                Section("汽水音乐与蓝牙歌词") {
+                    Text("在 iPhone 系统蓝牙中配对圆屏，然后在汽水音乐的设置里开启“外接设备蓝牙时展示歌词”。")
+                    Text("配套固件会接收音乐 App 通过蓝牙媒体信息输出的文字。歌词是否可用取决于播放器与系统实际输出；没有歌词时显示收到的歌曲信息。")
+                        .font(.footnote).foregroundStyle(Color.secondary)
                 }
             }
             .modifier(QianInstrumentSurface())

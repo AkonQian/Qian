@@ -9,6 +9,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var navigationFailure: String?
     @Published private(set) var isNavigationActive = false
     @Published private(set) var isDemoActive = false
+    @Published private(set) var totalRideDistanceM: Double
+    private let rideOdometer: RideOdometer
 
     @Published var destinationQuery = ""
     @Published private(set) var placeResults: [PlaceSearchResult] = []
@@ -42,6 +44,9 @@ final class AppModel: ObservableObject {
     private static let recentPlacesKey = "MotoGPS.RecentPlaces.v1"
 
     init(gatewayBaseURL: URL = AppConfiguration.gatewayBaseURL) {
+        let odometer = RideOdometer()
+        rideOdometer = odometer
+        totalRideDistanceM = odometer.totalDistanceM
         liveRouteProvider = AmapGatewayRouteProvider(baseURL: gatewayBaseURL)
         placeProvider = AmapGatewayPlaceProvider(baseURL: gatewayBaseURL)
         mapGatewayBaseURL = gatewayBaseURL
@@ -102,6 +107,12 @@ final class AppModel: ObservableObject {
         }
 
         #if DEBUG
+        // Internal test hook; no demo entry is shown in the shipping home UI.
+        if ProcessInfo.processInfo.arguments.contains("--moto-demo-on-launch") {
+            Task { @MainActor [weak self] in
+                self?.startDemoNavigation()
+            }
+        }
         // Offline UI checks must not request device permissions or contact services.
         if ProcessInfo.processInfo.arguments.contains("--moto-ui-offline") { return }
         #endif
@@ -109,15 +120,6 @@ final class AppModel: ObservableObject {
         mediaController.start()
         bluetooth.connect()
 
-        #if DEBUG
-        // Command-line-only hook for a repeatable phone-to-round-screen smoke
-        // test. Normal App launches and the visible demo control are unchanged.
-        if ProcessInfo.processInfo.arguments.contains("--moto-demo-on-launch") {
-            Task { @MainActor [weak self] in
-                self?.startDemoNavigation()
-            }
-        }
-        #endif
     }
 
     deinit {
@@ -339,6 +341,7 @@ final class AppModel: ObservableObject {
         self.runtime = runtime
         isDemoActive = false
         navigationFailure = nil
+        rideOdometer.resetSegment()
         let started = runtime.start(
             destination: selectedPlace.location,
             destinationPOIID: selectedPlace.id.isEmpty ? nil : selectedPlace.id
@@ -377,6 +380,7 @@ final class AppModel: ObservableObject {
     }
 
     func stopNavigation() {
+        rideOdometer.resetSegment()
         runtime?.stop()
         runtime = nil
         isNavigationActive = false
@@ -429,6 +433,11 @@ final class AppModel: ObservableObject {
     }
 
     private func bind(_ runtime: SharedNavigationRuntime) {
+        runtime.onLocationFix = { [weak self] fix in
+            guard let self, !self.isDemoActive else { return }
+            self.rideOdometer.record(fix)
+            self.totalRideDistanceM = self.rideOdometer.totalDistanceM
+        }
         runtime.onSnapshot = { [weak self] snapshot in
             self?.navigation = snapshot
             if snapshot.stateName == "navigating" || snapshot.stateName == "arrived" {

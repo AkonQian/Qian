@@ -7,9 +7,7 @@ final class GatewaySettingsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
         app.launch()
-        let setup = app.buttons["gateway-settings-toolbar"]
-        XCTAssertTrue(setup.waitForExistence(timeout: 10))
-        setup.tap()
+        openGateway(in: app)
         let field = app.textFields["gateway-address-field"].exists
             ? app.textFields["gateway-address-field"] : app.textViews["gateway-address-field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
@@ -17,14 +15,13 @@ final class GatewaySettingsUITests: XCTestCase {
         field.typeText("https://nav.example.com/moto-gps/api")
         keepScreenshot(app, "Gateway address entry")
         app.buttons["gateway-save-button"].tap()
+        for _ in 0..<6 where !app.textFields["destination-search-field"].isHittable { app.swipeDown() }
         XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["gateway-setup-button"].exists)
         app.terminate()
         app.launchArguments = ["--moto-ui-offline"]
         app.launch()
-        let settings = app.buttons["gateway-settings-toolbar"]
-        XCTAssertTrue(settings.waitForExistence(timeout: 5))
-        settings.tap()
+        openGateway(in: app)
         let saved = app.descendants(matching: .any).matching(identifier: "gateway-address-field").firstMatch
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         XCTAssertEqual(saved.value as? String, "https://nav.example.com/moto-gps/api/")
@@ -35,9 +32,7 @@ final class GatewaySettingsUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
         app.launch()
-        let setup = app.buttons["gateway-settings-toolbar"]
-        XCTAssertTrue(setup.waitForExistence(timeout: 10))
-        setup.tap()
+        openGateway(in: app)
         let field = app.descendants(matching: .any).matching(identifier: "gateway-address-field").firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
@@ -49,17 +44,24 @@ final class GatewaySettingsUITests: XCTestCase {
         keepScreenshot(app, "Invalid gateway address")
     }
 
-    func testInstrumentHomeMovesPrivacyIntoTopLeftSettings() {
+    func testInstrumentHomePlacesGatewayBelowBadgeAndPrivacyInsideSettings() {
         let app = XCUIApplication()
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["home-ride-dashboard"].waitForExistence(timeout: 10))
-        XCTAssertEqual(app.staticTexts["qian-brand-title"].label, "Qian GPS")
+        XCTAssertFalse(app.staticTexts["qian-brand-title"].exists)
+        XCTAssertFalse(app.navigationBars.staticTexts["Qian GPS"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["total-ride-distance"].exists)
         XCTAssertFalse(app.buttons["gateway-setup-button"].exists)
-        XCTAssertFalse(app.buttons["gateway-settings-button"].exists)
+        XCTAssertFalse(app.buttons["gateway-settings-toolbar"].exists)
+        XCTAssertFalse(app.buttons["device-details-button"].exists)
         XCTAssertFalse(app.buttons["privacy-data-button"].exists)
+        XCTAssertFalse(app.buttons["demo-navigation-button"].exists)
         keepScreenshot(app, "Qian GPS instrument home")
-        app.buttons["gateway-settings-toolbar"].tap()
+        let gateway = app.buttons["gateway-settings-button"]
+        reveal(gateway, in: app)
+        XCTAssertGreaterThan(gateway.frame.minY, app.buttons["badge-gallery-button"].frame.minY)
+        gateway.tap()
         let privacy = app.buttons["privacy-data-button"]
         XCTAssertTrue(privacy.waitForExistence(timeout: 5))
         for _ in 0..<4 where !privacy.isHittable { app.swipeUp() }
@@ -78,31 +80,42 @@ final class GatewaySettingsUITests: XCTestCase {
         app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway",
                                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
-        XCTAssertTrue(app.buttons["gateway-settings-toolbar"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["home-ride-dashboard"].waitForExistence(timeout: 10))
         let search = app.textFields["destination-search-field"]
         for _ in 0..<4 where !search.isHittable { app.swipeUp() }
         XCTAssertTrue(search.isHittable)
         keepScreenshot(app, "Qian GPS large text home")
-        app.buttons["device-details-button"].tap()
+        let device = app.buttons["device-summary-button"]
+        reveal(device, in: app)
+        device.tap()
         XCTAssertTrue(app.buttons["device-details-done"].waitForExistence(timeout: 5))
         keepScreenshot(app, "Qian GPS instrument device details")
     }
 
     func testInstrumentDemoRideKeepsEndActionReachable() {
         let app = XCUIApplication()
-        app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway"]
+        app.launchArguments = ["--moto-ui-offline", "--moto-reset-gateway", "--moto-demo-on-launch"]
         app.launch()
-        let demo = app.buttons["demo-navigation-button"]
-        XCTAssertTrue(demo.waitForExistence(timeout: 10))
-        for _ in 0..<4 where !demo.isHittable { app.swipeUp() }
-        demo.tap()
         let dashboard = app.descendants(matching: .any)["active-ride-dashboard"]
         XCTAssertTrue(dashboard.waitForExistence(timeout: 10))
         let end = app.buttons["primary-navigation-action"]
+        for _ in 0..<4 where !end.isHittable { app.swipeUp() }
         XCTAssertTrue(end.isHittable)
         keepScreenshot(app, "Qian GPS active ride instrument")
         end.tap()
         XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 5))
+    }
+
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(element.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+        XCTAssertTrue(element.isHittable)
+    }
+
+    private func openGateway(in app: XCUIApplication) {
+        let gateway = app.buttons["gateway-settings-button"]
+        reveal(gateway, in: app)
+        gateway.tap()
     }
 
     private func keepScreenshot(_ app: XCUIApplication, _ name: String) {

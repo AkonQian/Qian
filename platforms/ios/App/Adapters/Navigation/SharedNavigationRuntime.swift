@@ -7,6 +7,7 @@ import MotoNavigationCore
 final class SharedNavigationRuntime {
     var onSnapshot: ((MotoNavCoreSnapshot) -> Void)?
     var onFailure: ((String) -> Void)?
+    var onLocationFix: ((NavigationFix) -> Void)?
 
     private let bridge = MotoNavCoreBridge()
     private let locationSource: any NavigationLocationSource
@@ -98,6 +99,7 @@ final class SharedNavigationRuntime {
     }
 
     private func accept(_ fix: NavigationFix) {
+        onLocationFix?(fix)
         let commands = bridge.pushFixLongitude(
             fix.coordinate.longitudeDeg,
             latitude: fix.coordinate.latitudeDeg,

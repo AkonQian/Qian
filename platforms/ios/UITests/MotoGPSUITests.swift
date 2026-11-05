@@ -65,26 +65,23 @@ final class MotoGPSUITests: XCTestCase {
         ))
     }
 
-    func testDeviceDetailsPreserveDestinationSearch() throws {
+    func testDeviceDetailsReturnToDestinationSearch() throws {
         let app = XCUIApplication()
         app.launch()
 
         let search = app.textFields["destination-search-field"]
         XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.tap()
-        let query = "奥体中心"
-        search.typeText(query)
-
-        let detailsButton = app.buttons["device-details-button"]
+        let detailsButton = app.buttons["device-summary-button"]
         XCTAssertTrue(detailsButton.waitForExistence(timeout: 3))
+        for _ in 0..<6 where !detailsButton.isHittable { app.swipeUp() }
         detailsButton.tap()
 
         let sheet = app.descendants(matching: .any)["device-details-sheet"]
         XCTAssertTrue(sheet.waitForExistence(timeout: 3))
         keepScreenshot(of: app, named: "MOTO GPS device details")
 
-        // Device availability varies on the simulator. Inspecting the sheet
-        // must preserve the search independently of its current BLE state.
+        // Device details open through the home row; destination search must
+        // remain usable after returning, independently of BLE availability.
         let done = app.buttons["device-details-done"]
         XCTAssertTrue(done.waitForExistence(timeout: 3))
         done.tap()
@@ -94,7 +91,11 @@ final class MotoGPSUITests: XCTestCase {
             object: sheet
         )
         XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 3), .completed)
+        for _ in 0..<6 where !search.isHittable { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 3))
+        search.tap()
+        let query = "奥体中心"
+        search.typeText(query)
         XCTAssertEqual(search.value as? String, query)
         XCTAssertFalse(app.descendants(matching: .any)["route-preview-map"].exists)
     }
@@ -249,11 +250,8 @@ final class MotoGPSUITests: XCTestCase {
 
     func testBuiltInNavigationDemoStarts() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--moto-demo-on-launch"]
         app.launch()
-
-        let demo = app.buttons["demo-navigation-button"]
-        XCTAssertTrue(demo.waitForExistence(timeout: 5))
-        demo.tap()
 
         // Demo may briefly show acquiring/planning before navigating.
         let end = app.buttons["结束导航"]
@@ -264,11 +262,8 @@ final class MotoGPSUITests: XCTestCase {
 
     func testEndingDemoNavigationReturnsToHome() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--moto-demo-on-launch"]
         app.launch()
-
-        let demo = app.buttons["demo-navigation-button"]
-        XCTAssertTrue(demo.waitForExistence(timeout: 5))
-        demo.tap()
 
         let end = app.buttons["结束导航"]
         XCTAssertTrue(end.waitForExistence(timeout: 15))
@@ -277,7 +272,7 @@ final class MotoGPSUITests: XCTestCase {
         // Ending navigation must clear the stuck route-preview state and
         // bring the rider back to the destination-search home screen.
         XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["demo-navigation-button"].exists)
+        XCTAssertFalse(app.buttons["demo-navigation-button"].exists)
         XCTAssertFalse(end.exists)
         XCTAssertFalse(app.staticTexts["正在骑行"].exists)
     }
@@ -341,8 +336,9 @@ final class MotoGPSUITests: XCTestCase {
 
         // Keep the device controls reachable in every appearance/text-size
         // variant without asserting any particular Bluetooth state.
-        let detailsButton = app.buttons["device-details-button"]
+        let detailsButton = app.buttons["device-summary-button"]
         XCTAssertTrue(detailsButton.waitForExistence(timeout: 3))
+        for _ in 0..<6 where !detailsButton.isHittable { app.swipeUp() }
         XCTAssertTrue(detailsButton.isHittable)
         detailsButton.tap()
 
