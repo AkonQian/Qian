@@ -1,83 +1,71 @@
-name: iOS sideload build
-
+name: Phone UI gallery
 on:
   push:
-    paths: ['platforms/ios/**', 'shared/**', 'scripts/ios/**', '.github/workflows/ios-sideload.yml']
-  pull_request:
-    paths: ['platforms/ios/**', 'shared/**', 'scripts/ios/**', '.github/workflows/ios-sideload.yml']
+    branches: ['phone-ui-gallery-0310']
   workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: ios-sideload-${{ github.ref }}
-  cancel-in-progress: true
-
+  actions: read
 jobs:
-  ios:
+  gallery:
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '24'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepare bundled Shenzhen map from pinned OSM snapshot
+          name: MOTO-GPS-unsigned-IPA
+          path: build/gallery-input
+          github-token: ${{ github.token }}
+          run-id: 42149121455
+      - name: Restore identical bundled Shenzhen data
         run: |
-          python3 -m pip install osmium==4.3.2 shapely==2.2.0
-          bash scripts/offline_map/prepare_shenzhen.sh
-      - name: Prepare Xcode project
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, zipfile
+          ipa=next(Path('build/gallery-input').glob('*.ipa'))
+          assert hashlib.sha256(ipa.read_bytes()).hexdigest()=='00f156a96b8b68f983107f9b40ec0e7b49cba0a2045353d61164fa8e1c69f5a8'
+          with zipfile.ZipFile(ipa) as z:
+              name=next(n for n in z.namelist() if n.endswith('/shenzhen-v1.sqlite'))
+              data=z.read(name)
+          assert hashlib.sha256(data).hexdigest()=='665b8bc749b6dab1f3a3ee48f3b26b1e901d1850ad754edbe66c9258c46a2885'
+          target=Path('shared/offline_map/shenzhen-v1.sqlite')
+          target.parent.mkdir(parents=True,exist_ok=True)
+          target.write_bytes(data)
+          PY
+      - name: Prepare gallery build
         run: |
           command -v xcodegen || brew install xcodegen
-          xcodebuild -version
           xcodegen generate --spec platforms/ios/project.yml
-      - name: Select available iPhone simulator
+      - name: Select simulator
         id: simulator
         run: |
           python3 - <<'PY'
-          import json, os, subprocess
-          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
-          iphones = [d for runtime, values in devices.items() if 'iOS' in runtime for d in values if 'iPhone' in d['name']]
-          if not iphones:
-              raise SystemExit('No iPhone simulator is installed')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write('id=' + iphones[0]['udid'] + '\n')
+          import json,os,subprocess
+          devices=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','-j']))['devices']
+          phones=[d for runtime,items in devices.items() if 'iOS' in runtime for d in items if 'iPhone' in d['name']]
+          assert phones
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('id='+phones[0]['udid']+'\n')
           PY
-      - name: App unit tests and offline gateway UI tests
+      - name: Capture current app views
         run: |
           xcodebuild test -project platforms/ios/MotoGPS.xcodeproj -scheme MotoGPS \
             -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' \
-            -derivedDataPath build/ios-tests -resultBundlePath build/GatewayTests.xcresult \
-            -only-testing:MotoGPSUnitTests -only-testing:MotoGPSUITests/GatewaySettingsUITests \
-            CODE_SIGNING_ALLOWED=NO
-      - name: Build unsigned IPA for re-signing
-        run: bash scripts/ios/build_sideload_ipa.sh
-      - name: Export UI screenshots
+            -derivedDataPath build/gallery-tests -resultBundlePath build/PhoneGallery.xcresult \
+            -only-testing:MotoGPSUITests/PhoneGalleryUITests CODE_SIGNING_ALLOWED=NO
+      - name: Export screenshots
         if: always()
         run: |
-          if [ -d build/GatewayTests.xcresult ]; then
-            xcrun xcresulttool export attachments --path build/GatewayTests.xcresult --output-path build/ui-screenshots
+          if [ -d build/PhoneGallery.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/PhoneGallery.xcresult --output-path build/phone-gallery-screenshots
           fi
-      - name: Upload IPA and checksum
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: MOTO-GPS-unsigned-IPA
-          path: |
-            build/sideload/*.ipa
-            build/sideload/SHA256SUMS.txt
-          if-no-files-found: error
-      - name: Upload test results and screenshots
+      - name: Upload gallery
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: iOS-test-results
-          path: |
-            build/GatewayTests.xcresult
-            build/ui-screenshots
+          name: Qian-GPS-phone-UI-gallery
+          path: build/phone-gallery-screenshots
+          if-no-files-found: warn
           retention-days: 14

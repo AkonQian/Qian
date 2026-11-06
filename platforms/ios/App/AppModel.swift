@@ -43,6 +43,53 @@ final class AppModel: ObservableObject {
     private var routePreviewRequestID: UInt32 = 1
     private var routePreviewGeneration: UInt64 = 0
 
+    #if DEBUG
+    private func installGalleryFixture(_ mode: String) {
+        automaticLocationEnabled = false
+        searchLocationStatus = .available
+        let mapPoints = [GCJ02Point(longitudeDeg: 114.057, latitudeDeg: 22.539),
+                         GCJ02Point(longitudeDeg: 114.061, latitudeDeg: 22.539),
+                         GCJ02Point(longitudeDeg: 114.061, latitudeDeg: 22.545),
+                         GCJ02Point(longitudeDeg: 114.066, latitudeDeg: 22.545)]
+        let points = mapPoints.map(ChinaCoordinateTransform.gcj02ToWGS84)
+        let origin = points[0]
+        let destination = points[points.count - 1]
+        let route = RoutePlan(routeID: "ui-gallery-shenzhen-example", provider: "ui-gallery-example",
+            generatedAtMs: UInt64(Date().timeIntervalSince1970 * 1000), totalDistanceM: 1500,
+            totalDurationS: 300, polyline: mapPoints,
+            maneuvers: [RouteManeuver(id: 1, type: .right, routeOffsetM: 400,
+                roadName: "前方道路", instruction: "前方右转"),
+                RouteManeuver(id: 2, type: .arrive, routeOffsetM: 1500,
+                roadName: "示例终点", instruction: "到达目的地")],
+            traffic: [TrafficSegment(startOffsetM: 0, endOffsetM: 1500, level: .freeFlow)])
+        if mode == "home" {
+            let bridge = MotoNavCoreBridge()
+            _ = bridge.pushFixLongitude(origin.longitudeDeg, latitude: origin.latitudeDeg,
+                accuracyM: 5, speedMPS: 10, headingDeg: 90,
+                timestampMs: UInt64(Date().timeIntervalSince1970 * 1000))
+            navigation = bridge.snapshot
+            return
+        }
+        selectedPlace = PlaceSearchResult(id: "gallery-destination", name: "深圳骑行终点（示例）",
+            address: "界面展示用路线", city: "深圳市", district: "", displayArea: "深圳市",
+            location: destination, distanceM: 1500)
+        destinationQuery = selectedPlace!.name
+        if mode == "preview" {
+            routePreviewOrigin = origin
+            routePreviewCandidates = [RoutePreviewCandidate(ordinal: 0, route: route)]
+            selectedRoutePreviewID = routePreviewCandidates[0].id
+            return
+        }
+        isNavigationActive = true
+        isDemoActive = false
+        let runtime = SharedNavigationRuntime(locationSource: PhoneGalleryLocation(origin: origin),
+            routeProvider: PhoneGalleryRoutes(route: route))
+        runtime.onSnapshot = { [weak self] in self?.navigation = $0 }
+        self.runtime = runtime
+        runtime.start(destination: destination)
+    }
+    #endif
+
     private static let recentPlacesKey = "MotoGPS.RecentPlaces.v1"
 
     init(gatewayBaseURL: URL = AppConfiguration.gatewayBaseURL) {
@@ -109,6 +156,12 @@ final class AppModel: ObservableObject {
         }
 
         #if DEBUG
+        for mode in ["home", "preview", "ride"] {
+            if ProcessInfo.processInfo.arguments.contains("--qian-gallery-" + mode) {
+                installGalleryFixture(mode)
+                return
+            }
+        }
         // Internal test hook; no demo entry is shown in the shipping home UI.
         if ProcessInfo.processInfo.arguments.contains("--moto-demo-on-launch") {
             Task { @MainActor [weak self] in
@@ -685,3 +738,29 @@ private enum GatewaySettingsError: LocalizedError {
     case navigationActive
     var errorDescription: String? { "请先结束导航，再更换网关地址。" }
 }
+
+#if DEBUG
+private struct PhoneGalleryRoutes: NavigationRouteProviding {
+    let route: RoutePlan
+    func route(for request: RouteRequest) async throws -> RouteEnvelope {
+        RouteEnvelope(requestID: request.requestID, route: route)
+    }
+}
+@MainActor
+private final class PhoneGalleryLocation: NavigationLocationSource {
+    let origin: WGS84Point
+    var task: Task<Void, Never>?
+    init(origin: WGS84Point) { self.origin = origin }
+    func start(onFix: @escaping @MainActor (NavigationFix) -> Void,
+               onFailure: @escaping @MainActor (String) -> Void) throws {
+        task = Task { @MainActor [origin] in
+            while !Task.isCancelled {
+                onFix(NavigationFix(coordinate: origin, horizontalAccuracyM: 5, speedMps: 10,
+                    courseDeg: 90, timestamp: Date()))
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+    func stop() { task?.cancel(); task = nil }
+}
+#endif
