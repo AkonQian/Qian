@@ -98,12 +98,30 @@ final class GatewaySettingsUITests: XCTestCase {
         app.launch()
         let dashboard = app.descendants(matching: .any)["active-ride-dashboard"]
         XCTAssertTrue(dashboard.waitForExistence(timeout: 10))
+        dismissPendingSystemPermissions()
         let end = app.buttons["primary-navigation-action"]
         for _ in 0..<4 where !end.isHittable { app.swipeUp() }
         XCTAssertTrue(end.isHittable)
         keepScreenshot(app, "Qian GPS active ride instrument")
         end.tap()
         XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 5))
+    }
+
+    private func dismissPendingSystemPermissions() {
+        // The unit-test host can leave first-launch prompts pending for this
+        // bundle. Dismiss them before tapping End: XCTest's default handler
+        // can consume that tap while it handles multiple permission alerts.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for _ in 0..<4 {
+            let alert = springboard.alerts.firstMatch
+            guard alert.waitForExistence(timeout: 1) else { return }
+            let decline = alert.buttons.matching(NSPredicate(
+                format: "label IN %@", ["Don’t Allow", "Don't Allow", "不允许"]
+            )).firstMatch
+            XCTAssertTrue(decline.waitForExistence(timeout: 2))
+            decline.tap()
+        }
+        XCTAssertFalse(springboard.alerts.firstMatch.exists)
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
