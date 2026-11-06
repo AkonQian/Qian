@@ -23,7 +23,9 @@ final class CoreLocationNavigationSource: NSObject, NavigationLocationSource {
         manager.pausesLocationUpdatesAutomatically = false
         manager.allowsBackgroundLocationUpdates = true
         #if os(iOS)
-        manager.showsBackgroundLocationIndicator = true
+        // With Always authorization, iOS permits continuous background GPS
+        // without the blue status-bar pill. When In Use still shows it.
+        manager.showsBackgroundLocationIndicator = false
         #endif
     }
 
