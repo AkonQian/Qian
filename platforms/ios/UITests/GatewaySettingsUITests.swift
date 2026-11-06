@@ -107,8 +107,10 @@ final class GatewaySettingsUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        XCTAssertTrue(element.waitForExistence(timeout: 10))
+        // SwiftUI List creates rows lazily: scroll before expecting an
+        // off-screen settings row to exist in the accessibility tree.
         for _ in 0..<6 where !element.isHittable { app.swipeUp() }
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
         XCTAssertTrue(element.isHittable)
     }
 
