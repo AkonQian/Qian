@@ -120,6 +120,7 @@ struct ContentView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollIndicators(.hidden)
         .modifier(QianInstrumentSurface())
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("")
@@ -185,12 +186,27 @@ struct ContentView: View {
     }
 
     private func speedReadout(active: Bool) -> some View {
-        VStack(spacing: 7) {
-            Text(model.gpsSpeedText)
-                .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 96 : 120, weight: .bold, design: .rounded))
-                .monospacedDigit().tracking(-4).lineLimit(1).minimumScaleFactor(0.65)
-                .contentTransition(.numericText())
-                .accessibilityIdentifier("ride-speed-value")
+        let fontSize: CGFloat = dynamicTypeSize.isAccessibilitySize ? 96 : 120
+        let lineHeight = UIFont.systemFont(ofSize: fontSize, weight: .bold).lineHeight
+        return VStack(spacing: 7) {
+            Group {
+                if model.hasCurrentGPSSpeed {
+                    Text(model.gpsSpeedText)
+                        .font(.system(size: fontSize, weight: .bold, design: .rounded))
+                        .monospacedDigit().tracking(-4).lineLimit(1).minimumScaleFactor(0.65)
+                        .contentTransition(.numericText())
+                        .accessibilityIdentifier("ride-speed-value")
+                } else {
+                    // A shape has symmetric rounded ends and cannot inherit
+                    // the numeric text's negative trailing character spacing.
+                    Capsule()
+                        .fill(Color.primary)
+                        .frame(width: fontSize * 0.75, height: fontSize * 0.1)
+                        .accessibilityLabel("速度暂不可用")
+                        .accessibilityIdentifier("ride-speed-value")
+                }
+            }
+            .frame(height: lineHeight)
             VStack(spacing: 5) {
                 Text("KM/H").font(.system(.caption, design: .monospaced).weight(.bold)).tracking(1)
                 Text(model.gpsSpeedStatus)
