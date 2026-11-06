@@ -186,15 +186,14 @@ struct ContentView: View {
 
     private func speedReadout(active: Bool) -> some View {
         VStack(spacing: 7) {
-            Text(active && model.navigation.hasUsableFix && !model.navigation.gnssStale
-                 ? String(format: "%.0f", max(0, model.navigation.speedMPS * 3.6)) : (active ? "—" : "0"))
+            Text(model.gpsSpeedText)
                 .font(.system(size: dynamicTypeSize.isAccessibilitySize ? 96 : 120, weight: .bold, design: .rounded))
                 .monospacedDigit().tracking(-4).lineLimit(1).minimumScaleFactor(0.65)
                 .contentTransition(.numericText())
                 .accessibilityIdentifier("ride-speed-value")
             VStack(spacing: 5) {
                 Text("KM/H").font(.system(.caption, design: .monospaced).weight(.bold)).tracking(1)
-                Text(active ? (model.navigation.gnssStale ? "位置待更新" : "当前速度") : "导航后显示速度")
+                Text(model.gpsSpeedStatus)
                     .font(.caption2).fixedSize(horizontal: false, vertical: true)
             }
             .foregroundStyle(Color.secondary)
@@ -205,7 +204,7 @@ struct ContentView: View {
 
     private var dashboardStatuses: some View {
         Group {
-            Label(model.searchBiasAvailable ? "定位已就绪" : "定位待就绪", systemImage: "location")
+            Label(model.hasCurrentGPSSpeed ? "定位已就绪" : "定位待就绪", systemImage: "location")
             Label("深圳底图已内置", systemImage: "map")
         }
         .font(.caption.weight(.medium)).foregroundStyle(Color.secondary)

@@ -3,7 +3,7 @@ import MotoNavigationCore
 
 @MainActor
 final class CoreLocationNavigationSource: NSObject, NavigationLocationSource {
-    private static let maximumFixAgeS: TimeInterval = 15
+    private static let maximumFixAgeS: TimeInterval = 5
     private let manager = CLLocationManager()
     private var onFix: (@MainActor (NavigationFix) -> Void)?
     private var onFailure: (@MainActor (String) -> Void)?

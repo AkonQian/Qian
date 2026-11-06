@@ -29,9 +29,9 @@
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Qian GPS 使用蓝牙连接车把上的 ESP32-S3 圆屏设备。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>导航开始后，Qian GPS 需要在锁屏或切换应用时继续更新骑行位置。</string>
+	<string>Qian GPS 需要在锁屏或切换应用时继续更新骑行速度、圆屏显示和导航位置。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Qian GPS 需要定位来规划路线并更新骑行位置。</string>
+	<string>Qian GPS 需要定位来显示实时骑行速度、同步圆屏并规划路线。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

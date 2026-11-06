@@ -9,6 +9,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var navigationFailure: String?
     @Published private(set) var isNavigationActive = false
     @Published private(set) var isDemoActive = false
+    @Published private(set) var locationFailure: String?
     @Published private(set) var totalRideDistanceM: Double
     private let rideOdometer: RideOdometer
 
@@ -36,6 +37,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var mapGatewayBaseURL: URL
     @Published private(set) var isUpdatingGateway = false
     private var runtime: SharedNavigationRuntime?
+    private var automaticLocationEnabled = true
     private var placeSearchTask: Task<Void, Never>?
     private var routePreviewTask: Task<Void, Never>?
     private var routePreviewRequestID: UInt32 = 1
@@ -114,11 +116,15 @@ final class AppModel: ObservableObject {
             }
         }
         // Offline UI checks must not request device permissions or contact services.
-        if ProcessInfo.processInfo.arguments.contains("--moto-ui-offline") { return }
+        if ProcessInfo.processInfo.arguments.contains("--moto-ui-offline") {
+            automaticLocationEnabled = false
+            return
+        }
         #endif
         searchLocation.prepare()
         mediaController.start()
         bluetooth.connect()
+        resumeGPSSpeedTracking()
 
     }
 
@@ -151,6 +157,29 @@ final class AppModel: ObservableObject {
             return device.negotiatedProtocol == "V1"
         }
         return false
+    }
+
+    var hasCurrentGPSSpeed: Bool { navigation.hasUsableFix && !navigation.gnssStale }
+
+    var gpsSpeedText: String {
+        hasCurrentGPSSpeed ? String(format: "%.0f", max(0, navigation.speedMPS * 3.6)) : "—"
+    }
+
+    var gpsSpeedStatus: String {
+        if locationFailure != nil { return "定位不可用，请检查定位权限" }
+        if !navigation.hasUsableFix { return "定位待就绪" }
+        return navigation.gnssStale ? "位置待更新" : "GPS 实时速度"
+    }
+
+    func resumeGPSSpeedTracking() {
+        guard automaticLocationEnabled, !isNavigationActive else { return }
+        let page = navigation.displayPageName
+        runtime?.stop()
+        let runtime = SharedNavigationRuntime(locationSource: liveLocation, routeProvider: liveRouteProvider)
+        bind(runtime)
+        self.runtime = runtime
+        locationFailure = nil
+        runtime.startTracking(displayPageName: page)
     }
 
     /// Navigation can start before BLE is ready. The central retains the newest
@@ -342,13 +371,18 @@ final class AppModel: ObservableObject {
         isDemoActive = false
         navigationFailure = nil
         rideOdometer.resetSegment()
+        let displayPageName = navigation.displayPageName
+        isNavigationActive = true
         let started = runtime.start(
             destination: selectedPlace.location,
-            destinationPOIID: selectedPlace.id.isEmpty ? nil : selectedPlace.id
+            destinationPOIID: selectedPlace.id.isEmpty ? nil : selectedPlace.id,
+            displayPageName: displayPageName
         )
         isNavigationActive = started
         if !started {
+            runtime.stop()
             self.runtime = nil
+            resumeGPSSpeedTracking()
         }
     }
 
@@ -391,6 +425,7 @@ final class AppModel: ObservableObject {
         // on route preview with no obvious way back to the home/search screen.
         // Match the web shell: end → back to destination search.
         clearDestination()
+        resumeGPSSpeedTracking()
     }
 
     func selectRoutePreview(_ id: String) {
@@ -434,7 +469,9 @@ final class AppModel: ObservableObject {
 
     private func bind(_ runtime: SharedNavigationRuntime) {
         runtime.onLocationFix = { [weak self] fix in
-            guard let self, !self.isDemoActive else { return }
+            guard let self else { return }
+            self.locationFailure = nil
+            guard self.isNavigationActive, !self.isDemoActive else { return }
             self.rideOdometer.record(fix)
             self.totalRideDistanceM = self.rideOdometer.totalDistanceM
         }
@@ -452,7 +489,9 @@ final class AppModel: ObservableObject {
             }
         }
         runtime.onFailure = { [weak self] message in
-            self?.navigationFailure = message
+            guard let self else { return }
+            if self.isNavigationActive { self.navigationFailure = message }
+            else { self.locationFailure = message }
         }
     }
 

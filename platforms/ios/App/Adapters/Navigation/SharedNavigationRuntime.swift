@@ -37,10 +37,12 @@ final class SharedNavigationRuntime {
     }
 
     @discardableResult
-    func start(destination: WGS84Point, destinationPOIID: String? = nil) -> Bool {
+    func start(destination: WGS84Point, destinationPOIID: String? = nil,
+               displayPageName: String = "navigation") -> Bool {
         stop()
         self.destinationPOIID = destinationPOIID
         publish(bridge.reset())
+        publish(bridge.selectDisplayPageName(displayPageName))
         publish(bridge.setNetworkStateName("online"))
         publish(
             bridge.beginNavigation(
@@ -49,6 +51,34 @@ final class SharedNavigationRuntime {
             )
         )
 
+        let started = startLocationUpdates()
+        if !started {
+            self.destinationPOIID = nil
+            publish(bridge.cancelNavigation())
+        }
+        return started
+    }
+
+    /// GNSS telemetry uses the same authoritative core and BLE snapshots,
+    /// without a destination or any route/network request.
+    @discardableResult
+    func startTracking(displayPageName: String = "navigation") -> Bool {
+        stop()
+        publish(bridge.reset())
+        publish(bridge.selectDisplayPageName(displayPageName))
+        return startLocationUpdates()
+    }
+
+    private func startLocationUpdates() -> Bool {
+        // Keep freshness checks alive even if permission is initially denied;
+        // Core Location can resume through its authorization callback later.
+        tickTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self else { return }
+                self.tick(atMs: Self.nowMs())
+            }
+        }
         do {
             try locationSource.start(
                 onFix: { [weak self] fix in self?.accept(fix) },
@@ -56,19 +86,13 @@ final class SharedNavigationRuntime {
             )
         } catch {
             onFailure?(error.localizedDescription)
-            self.destinationPOIID = nil
-            publish(bridge.cancelNavigation())
             return false
         }
-
-        tickTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled, let self else { return }
-                self.publish(self.bridge.tick(atMs: Self.nowMs()))
-            }
-        }
         return true
+    }
+
+    func tick(atMs timestampMs: UInt64) {
+        publish(bridge.tick(atMs: timestampMs))
     }
 
     func stop() {
