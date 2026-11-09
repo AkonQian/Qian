@@ -9,7 +9,7 @@ final class PhoneVolumeTelemetryTests: XCTestCase {
         var discovery = BLEAccessoryDiscovery()
         XCTAssertTrue(discovery.needsDiscovery(oldCache))
         XCTAssertFalse(discovery.needsDiscovery(oldCache)) // old firmware: no rediscovery loop
-        let fresh = oldCache + [PhoneVolumeTelemetry.uuid]
+        let fresh = oldCache + [PhoneVolumeTelemetry.uuid, PhoneWatchTelemetry.uuid]
         XCTAssertFalse(discovery.needsDiscovery(fresh))
         discovery = BLEAccessoryDiscovery() // reconnect/restoration starts a new discovery pass
         XCTAssertTrue(discovery.needsDiscovery(oldCache))

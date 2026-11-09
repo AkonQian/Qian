@@ -54,6 +54,7 @@ final class AppModel: ObservableObject {
         mapGatewayBaseURL = gatewayBaseURL
         surroundingMap = SurroundingMapStore(baseURL: gatewayBaseURL)
         recentPlaces = Self.loadRecentPlaces()
+        bluetooth.updateWatchOdometer(totalRideDistanceM)
 
         surroundingMap.onScene = { [weak self] scene in
             self?.bluetooth.sendMapScene(scene)
@@ -474,6 +475,7 @@ final class AppModel: ObservableObject {
             guard self.isNavigationActive, !self.isDemoActive else { return }
             self.rideOdometer.record(fix)
             self.totalRideDistanceM = self.rideOdometer.totalDistanceM
+            self.bluetooth.updateWatchOdometer(self.totalRideDistanceM)
         }
         runtime.onSnapshot = { [weak self] snapshot in
             self?.navigation = snapshot

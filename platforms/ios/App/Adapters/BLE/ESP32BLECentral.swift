@@ -179,7 +179,7 @@ struct BLEMapSceneDelivery {
 struct BLEAccessoryDiscovery {
     private var requested = false
     mutating func needsDiscovery(_ discovered: [CBUUID]) -> Bool {
-        let required = [BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid]
+        let required = [BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid, PhoneWatchTelemetry.uuid]
         guard !requested, !required.allSatisfy({ discovered.contains($0) }) else { return false }
         requested = true
         return true
@@ -190,6 +190,8 @@ struct BLEAccessoryDiscovery {
 final class ESP32BLECentral: NSObject {
     let badge = BadgeTransferClient()
     private let phoneVolume = PhoneVolumeTelemetry()
+    private let phoneWatch = PhoneWatchTelemetry()
+    func updateWatchOdometer(_ meters: Double) { phoneWatch.odometerM = meters; phoneWatch.refresh() }
     private var accessoryDiscovery = BLEAccessoryDiscovery()
     // UUIDs belong to the CoreBluetooth transport adapter; the byte format is
     // implemented only by shared/ble_protocol through MotoBLEProtocolBridge.
@@ -442,7 +444,7 @@ final class ESP32BLECentral: NSObject {
             } else {
                 trace("using restored navigation service; rediscovering characteristics")
                 candidate.discoverCharacteristics(
-                    [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID, BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid],
+                    [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID, BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid, PhoneWatchTelemetry.uuid],
                     for: service
                 )
             }
@@ -498,13 +500,16 @@ final class ESP32BLECentral: NSObject {
            volume.properties.contains(.write) {
             phoneVolume.attach(candidate, characteristic: volume)
         }
+        if let watch = characteristics.first(where: { $0.uuid == PhoneWatchTelemetry.uuid }), watch.properties.contains(.write) {
+            phoneWatch.attach(candidate, characteristic: watch)
+        }
         if let badgeRX = characteristics.first(where: { $0.uuid == BadgeTransferClient.rxUUID }),
            let badgeTX = characteristics.first(where: { $0.uuid == BadgeTransferClient.txUUID }) {
             badge.attach(candidate, rx: badgeRX, tx: badgeTX)
         }
         if accessoryDiscovery.needsDiscovery(characteristics.map(\.uuid)) {
             candidate.discoverCharacteristics([Self.phoneToDeviceUUID, Self.deviceToPhoneUUID,
-                BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid], for: service)
+                BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid, PhoneWatchTelemetry.uuid], for: service)
         }
         trace("characteristics ready; rx=\(rx.properties.rawValue) tx=\(tx.properties.rawValue) notifying=\(tx.isNotifying)")
 
@@ -697,6 +702,7 @@ final class ESP32BLECentral: NSObject {
         phoneToDeviceCharacteristic = nil
         badge.detach()
         phoneVolume.detach()
+        phoneWatch.detach()
         accessoryDiscovery = BLEAccessoryDiscovery()
         deviceToPhoneCharacteristic = nil
         codec = nil
@@ -1052,6 +1058,7 @@ final class ESP32BLECentral: NSObject {
 
                 let now = Self.monotonicMs()
                 self.phoneVolume.refresh()
+                self.phoneWatch.refresh()
                 guard let sessionElapsed = self.heartbeatClock.elapsedMs(sessionID: self.sessionID, nowMs: now)
                 else { return }
                 if self.lastValidDeviceFrameAtMs > 0,
@@ -1326,7 +1333,7 @@ extension ESP32BLECentral: @preconcurrency CBPeripheralDelegate {
         }
         trace("navigation service discovered")
         peripheral.discoverCharacteristics(
-            [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID, BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid],
+            [Self.phoneToDeviceUUID, Self.deviceToPhoneUUID, BadgeTransferClient.rxUUID, BadgeTransferClient.txUUID, PhoneVolumeTelemetry.uuid, PhoneWatchTelemetry.uuid],
             for: service
         )
     }
@@ -1503,6 +1510,10 @@ extension ESP32BLECentral: @preconcurrency CBPeripheralDelegate {
     ) {
         guard shouldMaintainConnection, !transportTeardownInProgress,
               peripheral === self.peripheral else { return }
+        if characteristic.uuid == PhoneWatchTelemetry.uuid, characteristic.service?.uuid == Self.serviceUUID {
+            phoneWatch.writeCompleted(error: error)
+            return
+        }
         if characteristic.uuid == PhoneVolumeTelemetry.uuid,
            characteristic.service?.uuid == Self.serviceUUID {
             phoneVolume.writeCompleted(error: error)
