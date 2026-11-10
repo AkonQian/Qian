@@ -104,7 +104,15 @@ final class GatewaySettingsUITests: XCTestCase {
         XCTAssertTrue(end.isHittable)
         keepScreenshot(app, "Qian GPS active ride instrument")
         end.tap()
-        XCTAssertTrue(app.textFields["destination-search-field"].waitForExistence(timeout: 5))
+        // A queued simulator permission prompt can consume the first tap.
+        // Retry only while the same ride/dashboard is still present. Once
+        // home is shown its lazy List can retain the ride's scroll position.
+        dismissPendingSystemPermissions()
+        if dashboard.exists && end.isHittable { end.tap() }
+        let search = app.textFields["destination-search-field"]
+        for _ in 0..<6 where !search.exists { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        XCTAssertFalse(dashboard.exists)
     }
 
     private func dismissPendingSystemPermissions() {
