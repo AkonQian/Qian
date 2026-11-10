@@ -6,14 +6,22 @@ import MotoNavigationCore
 /// Break the segment at stops, poor fixes and gaps so reconnects cannot add a jump.
 final class RideOdometer {
     private static let key = "QianGPS.TotalRideDistanceM.v1"
+    private static let cycleComputerCalibrationKey = "QianGPS.OdometerCalibration.20261110.1200_8km.v1"
     private let defaults: UserDefaults
     private var previous: NavigationFix?
     private(set) var totalDistanceM: Double
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, applyCycleComputerCalibration: Bool = true) {
         self.defaults = defaults
         let saved = defaults.double(forKey: Self.key)
         totalDistanceM = saved.isFinite && saved >= 0 ? saved : 0
+        // Personal-build calibration requested by the rider. Persist a separate
+        // marker so relaunches and later updates retain all subsequent riding.
+        if applyCycleComputerCalibration && !defaults.bool(forKey: Self.cycleComputerCalibrationKey) {
+            totalDistanceM = 1_200_800
+            defaults.set(totalDistanceM, forKey: Self.key)
+            defaults.set(true, forKey: Self.cycleComputerCalibrationKey)
+        }
     }
 
     func resetSegment() { previous = nil }
