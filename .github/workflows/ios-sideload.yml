@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ios-sideload-${{ github.ref }}
@@ -28,10 +29,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Prepare bundled Shenzhen map from pinned OSM snapshot
+      - name: Restore verified released Shenzhen map
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python3 -m pip install osmium==4.3.2 shapely==2.2.0
-          bash scripts/offline_map/prepare_shenzhen.sh
+          mkdir -p build
+          gh api repos/${GITHUB_REPOSITORY}/actions/artifacts/13725599936/zip > build/verified-map-ipa.zip
+          python3 scripts/ios/restore_verified_shenzhen.py build/verified-map-ipa.zip
       - name: Prepare Xcode project
         run: |
           command -v xcodegen || brew install xcodegen
