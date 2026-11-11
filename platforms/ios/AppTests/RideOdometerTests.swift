@@ -42,19 +42,20 @@ final class RideOdometerTests: XCTestCase {
         XCTAssertEqual(store.totalDistanceM, 0)
     }
 
-    func testCycleComputerCalibrationReplaces424KmAndPersistsOnlyOnce() throws {
+    func testCycleComputerCalibrationReplacesPreviousReadingAndPersistsOnlyOnce() throws {
         let name = "QianGPS.OdometerTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
-        defaults.set(42_400.0, forKey: "QianGPS.TotalRideDistanceM.v1")
+        defaults.set(1_200_800.0, forKey: "QianGPS.TotalRideDistanceM.v1")
+        defaults.set(true, forKey: "QianGPS.OdometerCalibration.20261110.1200_8km.v1")
         defaults.set("keep-this-gateway", forKey: "unrelated-setting")
         let store = RideOdometer(defaults: defaults)
-        XCTAssertEqual(store.totalDistanceM, 1_200_800)
-        XCTAssertEqual(defaults.double(forKey: "QianGPS.TotalRideDistanceM.v1"), 1_200_800)
+        XCTAssertEqual(store.totalDistanceM, 1_214_000)
+        XCTAssertEqual(defaults.double(forKey: "QianGPS.TotalRideDistanceM.v1"), 1_214_000)
         XCTAssertEqual(defaults.string(forKey: "unrelated-setting"), "keep-this-gateway")
         store.record(fix(0))
         store.record(fix(2, latitude: 22.5401))
-        XCTAssertEqual(store.totalDistanceM, 1_200_811.1, accuracy: 0.2)
+        XCTAssertEqual(store.totalDistanceM, 1_214_011.1, accuracy: 0.2)
         XCTAssertEqual(RideOdometer(defaults: defaults).totalDistanceM, store.totalDistanceM)
         XCTAssertEqual(RideOdometer(defaults: defaults).totalDistanceM, store.totalDistanceM)
     }
@@ -64,13 +65,13 @@ final class RideOdometerTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let store = RideOdometer(defaults: defaults)
-        XCTAssertEqual(store.totalDistanceM, 1_200_800)
+        XCTAssertEqual(store.totalDistanceM, 1_214_000)
         let packet = PhoneWatchTelemetry.encode(date: Date(timeIntervalSince1970: 1_794_190_080),
                                                timezone: TimeZone(secondsFromGMT: 28_800)!,
                                                odometerM: store.totalDistanceM)
         let meters = packet[8...11].enumerated().reduce(UInt32(0)) { result, item in
             result | (UInt32(item.element) << (item.offset * 8))
         }
-        XCTAssertEqual(meters, 1_200_800)
+        XCTAssertEqual(meters, 1_214_000)
     }
 }

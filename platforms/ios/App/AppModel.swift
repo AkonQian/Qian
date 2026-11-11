@@ -45,8 +45,9 @@ final class AppModel: ObservableObject {
 
     private static let recentPlacesKey = "MotoGPS.RecentPlaces.v1"
 
-    init(gatewayBaseURL: URL = AppConfiguration.gatewayBaseURL) {
-        let odometer = RideOdometer()
+    init(gatewayBaseURL: URL = AppConfiguration.gatewayBaseURL,
+         odometer: RideOdometer? = nil, startServices: Bool = true) {
+        let odometer = odometer ?? RideOdometer()
         rideOdometer = odometer
         totalRideDistanceM = odometer.totalDistanceM
         liveRouteProvider = AmapGatewayRouteProvider(baseURL: gatewayBaseURL)
@@ -109,6 +110,10 @@ final class AppModel: ObservableObject {
             }
         }
 
+        guard startServices else {
+            automaticLocationEnabled = false
+            return
+        }
         #if DEBUG
         // Internal test hook; no demo entry is shown in the shipping home UI.
         if ProcessInfo.processInfo.arguments.contains("--moto-demo-on-launch") {
@@ -173,7 +178,9 @@ final class AppModel: ObservableObject {
     }
 
     func resumeGPSSpeedTracking() {
-        guard automaticLocationEnabled, !isNavigationActive else { return }
+        // Returning to the foreground must not restart an active GPS session
+        // or break its distance segment. Background/locked fixes use it too.
+        guard automaticLocationEnabled, !isNavigationActive, runtime == nil else { return }
         let page = navigation.displayPageName
         runtime?.stop()
         let runtime = SharedNavigationRuntime(locationSource: liveLocation, routeProvider: liveRouteProvider)
@@ -389,6 +396,7 @@ final class AppModel: ObservableObject {
 
     func startDemoNavigation() {
         guard !isNavigationActive, !isUpdatingGateway else { return }
+        rideOdometer.resetSegment()
         surroundingMap.reset()
         runtime?.stop()
         let demoSession = DemoNavigationSession()
@@ -468,14 +476,20 @@ final class AppModel: ObservableObject {
         bluetooth.toggleConnection()
     }
 
+    func recordGPSFix(_ fix: NavigationFix) {
+        locationFailure = nil
+        guard !isDemoActive else { return }
+        // GPS recording is independent of route selection, visible screen,
+        // Bluetooth connection and foreground/locked state.
+        rideOdometer.record(fix)
+        totalRideDistanceM = rideOdometer.totalDistanceM
+        bluetooth.updateWatchOdometer(totalRideDistanceM)
+    }
+
     private func bind(_ runtime: SharedNavigationRuntime) {
-        runtime.onLocationFix = { [weak self] fix in
-            guard let self else { return }
-            self.locationFailure = nil
-            guard self.isNavigationActive, !self.isDemoActive else { return }
-            self.rideOdometer.record(fix)
-            self.totalRideDistanceM = self.rideOdometer.totalDistanceM
-            self.bluetooth.updateWatchOdometer(self.totalRideDistanceM)
+        runtime.onLocationFix = { [weak self, weak runtime] fix in
+            guard let self, let runtime, self.runtime === runtime else { return }
+            self.recordGPSFix(fix)
         }
         runtime.onSnapshot = { [weak self] snapshot in
             self?.navigation = snapshot

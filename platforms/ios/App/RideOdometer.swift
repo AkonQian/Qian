@@ -2,11 +2,11 @@ import CoreLocation
 import Foundation
 import MotoNavigationCore
 
-/// Lifetime distance from real navigation fixes. Demo fixes never enter this store.
+/// Lifetime distance from real GPS fixes, with or without navigation.
 /// Break the segment at stops, poor fixes and gaps so reconnects cannot add a jump.
 final class RideOdometer {
     private static let key = "QianGPS.TotalRideDistanceM.v1"
-    private static let cycleComputerCalibrationKey = "QianGPS.OdometerCalibration.20261110.1200_8km.v1"
+    private static let cycleComputerCalibrationKey = "QianGPS.OdometerCalibration.20261111.1214km.v1"
     private let defaults: UserDefaults
     private var previous: NavigationFix?
     private(set) var totalDistanceM: Double
@@ -18,7 +18,7 @@ final class RideOdometer {
         // Personal-build calibration requested by the rider. Persist a separate
         // marker so relaunches and later updates retain all subsequent riding.
         if applyCycleComputerCalibration && !defaults.bool(forKey: Self.cycleComputerCalibrationKey) {
-            totalDistanceM = 1_200_800
+            totalDistanceM = 1_214_000
             defaults.set(totalDistanceM, forKey: Self.key)
             defaults.set(true, forKey: Self.cycleComputerCalibrationKey)
         }
